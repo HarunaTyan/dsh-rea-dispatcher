@@ -109,6 +109,10 @@ node test/smoke.mjs       # 需要本机已装 rea-agents
 node test/ab-surface.mjs  # 复算上面那张体积对照表
 ```
 
+## 问题反馈
+
+用 [GitHub Issues](https://github.com/HarunaTyan/dsh-rea-dispatcher/issues) 提，附上 DSH 版本、`rea-agents` 版本、`rea doctor --json` 的输出和报错原文。个人项目，尽力而为地修。
+
 ## 许可
 
 MIT。
