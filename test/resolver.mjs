@@ -1,7 +1,7 @@
 // Environment-derived defaults and pure helpers: no REA server needed, no network.
 //   node test/resolver.mjs
 import { join } from 'node:path'
-import { requiredParams, spillText, toolWarnings } from '../lib/index.js'
+import { isSessionLost, requiredParams, spillText, toolWarnings } from '../lib/index.js'
 import { tmpdir } from 'node:os'
 import { readdir, rm } from 'node:fs/promises'
 import {
@@ -84,6 +84,10 @@ check('UNC keeps its double slash', normalizePath('//server/share/x') === (proce
 check("root entry allows any absolute path", isAllowedCwd('D:/x', ['/']))
 check('drive root entry allows the whole drive', isAllowedCwd('D:/x/y', ['D:']))
 check('relative session cwd is never allowed', !isAllowedCwd('relative/dir', ['D:/proj']))
+
+check('session loss detected', isSessionLost({ isError: true, content: [{ type: 'text', text: 'target_unavailable: No app is open' }] }))
+check('normal result is not a session loss', !isSessionLost({ isError: false, content: [{ type: 'text', text: 'ok' }] }))
+check('plain error is not a session loss', !isSessionLost({ isError: true, content: [{ type: 'text', text: 'unsupported binary format' }] }))
 
 // ---- result rendering ----------------------------------------------------
 const long = renderResult({ content: [{ type: 'text', text: 'x'.repeat(100) }] }, 10)

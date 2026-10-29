@@ -63,6 +63,7 @@ rea_call  name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
 ```
 
 `rea_call` 对 REA 的错误原样返回，仅在首行标注来源为 REA 而非调度层。
+REA 的会话不跨轮（上一轮 `open_binary` 成功，下一轮仍可能报 `No app is open`）：默认会自动重开并重试一次，输出里会标注；`autoReopen: false` 可关掉。 插件不参与反编译：同一函数双跑（本插件 vs 本地 analyzeHeadless）的 token 分布一致，质量就是 Ghidra 原生水平。
 
 > 返回超过 `maxBytes` 时正文截断、全文落盘，尾部给出文件路径与行数，可用 `ops_read_files` / `ops_grep` 分段读取。
 >
@@ -95,6 +96,7 @@ rea_call  name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
 | `callTimeoutMs` | 单次 `rea_call` 超时 | 300000 ms |
 | `listTimeoutMs` | 握手与 `tools/list` 超时 | 120000 ms |
 | `maxBytes` | `rea_call` 返回上限；`0` 或负值按默认处理 | 20000 |
+| `autoReopen` | 遇到「No app is open」时自动重新 `open_binary` 并重试一次 | `true` |
 | `spill` | 超限时是否落盘全文 | `true` |
 | `spillDir` | 落盘目录 | `<DSH_HOME>/rea-spill` |
 | `spillKeep` | 落盘文件保留数量，超出按修改时间删除 | 50 |
