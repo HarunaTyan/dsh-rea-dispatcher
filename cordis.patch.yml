@@ -1,0 +1,7 @@
+# Mounts the REA dispatcher into a profile; all logic lives in ./lib/index.js.
+# `name` must equal this package's name (and the profile's dependency key).
+# No machine paths here — the package ships nothing machine-specific; override
+# `config` by entry id `rea-dispatcher` in the profile's own cordis.patch.yml.
+- insert:
+    - id: rea-dispatcher
+      name: dsh-rea-dispatcher
