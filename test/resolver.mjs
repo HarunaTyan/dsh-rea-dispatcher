@@ -1,6 +1,7 @@
 // Environment-derived defaults and pure helpers: no REA server needed, no network.
 //   node test/resolver.mjs
 import { join } from 'node:path'
+import { requiredParams, toolWarnings } from '../lib/index.js'
 import { tmpdir } from 'node:os'
 import {
   ReaMcp,
@@ -84,6 +85,16 @@ const structured = renderResult({ structuredContent: { a: 1 } }, 1000)
 check('structured content falls back to JSON', structured.text.includes('"a": 1'), structured.text)
 const empty = renderResult({ content: [{ type: 'text', text: '' }] }, 1000)
 check('empty text falls back to the raw result', empty.text.includes('"content"'), 'never returns an empty tool result')
+
+// ---- rea_help summary: required params and known traps -------------------
+const schema = { type: 'object', required: ['path', 'format'], properties: {} }
+check('requiredParams reads the schema', requiredParams(schema).join(',') === 'path,format', JSON.stringify(requiredParams(schema)))
+check('requiredParams tolerates junk', requiredParams(undefined).length === 0 && requiredParams({ required: 'x' }).length === 0)
+const trap = toolWarnings('Falls back to a unique source-file mapping when a 0x-prefixed number resolves to no procedure')
+check('file-offset trap detected', trap.length === 1 && trap[0].includes('file offset'), JSON.stringify(trap))
+check('absolute path requirement detected', toolWarnings('path must be an absolute path').some((w) => w.includes('绝对路径')))
+check('external tool requirement detected', toolWarnings('requires tshark on PATH').some((w) => w.includes('tshark')))
+check('no warnings for a plain description', toolWarnings('Lists procedures.').length === 0)
 
 console.log(failures.length === 0 ? '\nALL PASS' : `\nFAILED: ${failures.join(', ')}`)
 process.exit(failures.length === 0 ? 0 : 1)

@@ -86,7 +86,7 @@ dsh plugin --profile <profile> add github:HarunaTyan/dsh-rea-dispatcher
 
 ```
 rea_tools filter=image            # 找名字
-rea_help name=inspect_native_load_image   # 看参数
+rea_help name=inspect_native_load_image   # 看参数（首行给必填项与已知陷阱）
 rea_call name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
 ```
 
