@@ -29,7 +29,12 @@ const ctx = {
 }
 
 // cwdAllow is opt-in (empty = unrestricted); pin it here to prove the guard.
-const config = Config({ cwdAllow: ['D:/re-projects'] })
+import { rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+const spillDir = join(tmpdir(), 'rea-spill-smoke-' + process.pid)
+const config = Config({ cwdAllow: ['D:/re-projects'], spillDir })
 apply(ctx, config)
 
 const text = (name, value) =>
@@ -70,12 +75,14 @@ try {
   check('call passes provider errors through verbatim', call.includes('target_unavailable'))
 
   const cut = await run('rea_call', { name: 'current_address', maxBytes: 40 }, 'D:/re-projects')
-  check('call truncates at maxBytes', cut.includes('原始') && cut.length < 300)
+  check('call truncates at maxBytes', cut.includes('原始') && cut.length < 500)
+  check('truncated call spills the full text', cut.includes('全文已落盘') && cut.includes(spillDir), cut.slice(-160))
 
   const unknown = await run('rea_call', { name: 'no_such_tool' }, 'D:/re-projects')
   check('unknown tool is reported', unknown.includes('未找到工具'))
 } finally {
   for (const disposer of disposers) disposer()
+  await rm(spillDir, { recursive: true, force: true }).catch(() => {})
 }
 
 console.log(failures.length === 0 ? '\nALL PASS' : `\nFAILED: ${failures.join(', ')}`)

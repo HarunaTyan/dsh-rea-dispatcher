@@ -1,8 +1,9 @@
 // Environment-derived defaults and pure helpers: no REA server needed, no network.
 //   node test/resolver.mjs
 import { join } from 'node:path'
-import { requiredParams, toolWarnings } from '../lib/index.js'
+import { requiredParams, spillText, toolWarnings } from '../lib/index.js'
 import { tmpdir } from 'node:os'
+import { readdir, rm } from 'node:fs/promises'
 import {
   ReaMcp,
   resolveCachePath,
@@ -95,6 +96,18 @@ check('file-offset trap detected', trap.length === 1 && trap[0].includes('file o
 check('absolute path requirement detected', toolWarnings('path must be an absolute path').some((w) => w.includes('绝对路径')))
 check('external tool requirement detected', toolWarnings('requires tshark on PATH').some((w) => w.includes('tshark')))
 check('no warnings for a plain description', toolWarnings('Lists procedures.').length === 0)
+
+// ---- spill: oversized results land on disk instead of being lost ----------
+const spillDir = join(tmpdir(), 'rea-spill-test-' + process.pid)
+const big = 'line ' + 'x'.repeat(50) + '\n'.repeat(3) // 4 lines
+const first = await spillText(spillDir, 'list_procedures', big, 2)
+check('spill writes the whole text', first.chars === big.length && first.lines === 4, JSON.stringify(first))
+check('spill path mentions the tool', first.file.includes('list_procedures'), first.file)
+await spillText(spillDir, 'tool_a', 'a', 2)
+await spillText(spillDir, 'tool_b', 'b', 2)
+const kept = (await readdir(spillDir)).filter((name) => name.endsWith('.txt'))
+check('spill keeps only the newest N files', kept.length === 2, kept.join(','))
+await rm(spillDir, { recursive: true, force: true })
 
 console.log(failures.length === 0 ? '\nALL PASS' : `\nFAILED: ${failures.join(', ')}`)
 process.exit(failures.length === 0 ? 0 : 1)

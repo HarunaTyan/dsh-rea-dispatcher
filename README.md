@@ -63,6 +63,9 @@ dsh plugin --profile <profile> add github:HarunaTyan/dsh-rea-dispatcher
 | `callTimeoutMs` | `300000` | 单次 `rea_call` 超时。**超时后子进程会被丢弃**，下一次调用重新握手（否则卡住的 Ghidra 任务会堵住后续调用） |
 | `listTimeoutMs` | `120000` | 握手与 `tools/list` 超时 |
 | `maxBytes` | `20000` | `rea_call` 返回文本上限（超出截断并标注）。`0`/负数按默认值处理，不是「不限」 |
+| `spill` | `true` | 结果超 `maxBytes` 时把**全文**落盘，只回路径 + 前 `maxBytes` 字符，用文件工具分段读 |
+| `spillDir` | `''` | 落盘目录。空 = `<DSH_HOME>/rea-spill` |
+| `spillKeep` | `50` | 落盘文件保留个数，超出按修改时间删最旧 |
 | `helpMaxChars` | `12000` | `rea_help` 返回上限（个别工具 schema 有 4 万字符）。超限时先压说明文字，schema 尽量保住结构 |
 
 按 entry id 覆盖（profile 自己的 `cordis.patch.yml`）：
@@ -97,8 +100,7 @@ rea_call name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
 ## 适用边界（在一份 375 KB 的 PE 程序上实测）
 
 - **适合**：给一个已知地址问事——`procedure_info` / `procedure_pseudo_code` / `xrefs` / `search_strings` 之后跟 `xrefs`。单点、可验证。
-- **不适合**：把整个二进制摸一遍。`list_procedures` 一次返回 209,174 字符、`inspect_native_load_image` 31,351 字符，必然被 `maxBytes` 截断；
-  要枚举函数/字符串，本地 `analyzeHeadless` + 脚本落盘更划算。
+- **不适合**：把整个二进制摸一遍。`list_procedures` 一次返回 209,174 字符、`inspect_native_load_image` 31,351 字符，会被 `maxBytes` 截断——**但不会丢**：全文默认落盘到 `<DSH_HOME>/rea-spill/`，返回里给出路径与行数，模型用 `ops_read_files`/`ops_grep` 分段读。真要大范围枚举，本地 `analyzeHeadless` + 脚本仍然更省 token。
 - 每个 REA 响应外层还套 3–5 KB 的 evidence 信封（`analysis_profile` / `limitations` / 证据 id），那是 REA 自己的形状，不是本插件加的；
   设 `maxBytes` 时要按「信封 + 正文」估。
 
