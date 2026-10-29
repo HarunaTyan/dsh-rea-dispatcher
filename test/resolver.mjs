@@ -26,7 +26,7 @@ if (found === undefined) {
   check('reaMjs auto-detected on this machine', found.endsWith('rea.mjs'), String(found))
 }
 check('explicit reaMjs is honoured verbatim', resolveReaMjs('X:/custom/rea.mjs') === 'X:/custom/rea.mjs', 'a typo must fail at spawn, not fall back')
-check('blank explicit falls back to detection', resolveReaMjs('   ').endsWith('rea.mjs'))
+if (found !== undefined) check('blank explicit falls back to detection', resolveReaMjs('   ').endsWith('rea.mjs'))
 
 // ---- engine variables -----------------------------------------------------
 const savedGhidra = process.env.GHIDRA_INSTALL_DIR

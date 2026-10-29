@@ -4,11 +4,16 @@
 //     maps every REA tool to {name: mcp__rea__<raw>, description, parameters: inputSchema}.
 //     Source: dsh-mcp-client/lib/index.js createMcpToolDefinition (parameters = inputSchema verbatim).
 //  B: our dispatcher — three defineTool definitions compiled by the host's own defineTool.
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { apply, Config } from '../lib/index.js'
 import { resolveCachePath } from '../lib/rea-client.js'
 
-const catalog = JSON.parse(readFileSync(resolveCachePath(), 'utf8'))
+const cachePath = resolveCachePath()
+if (!existsSync(cachePath)) {
+  console.error('先跑一次 rea_tools（或 node test/smoke.mjs）生成工具表缓存：' + cachePath)
+  process.exit(1)
+}
+const catalog = JSON.parse(readFileSync(cachePath, 'utf8'))
 
 // ---- A: eager MCP surface -------------------------------------------------
 const mcpTable = catalog.tools.map((tool) => ({

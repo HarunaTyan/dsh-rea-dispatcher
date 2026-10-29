@@ -94,6 +94,21 @@ rea_call name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
 
 两处与缓存/超时相关的实测行为：工具表按已装 `rea-agents` 的版本号做缓存键，读不到版本号（自定义 `reaMjs` 不在包内）时**不写也不读缓存**，每次调用都重新拉 `tools/list`（约 3 MB / 2–3 s）；`rea_call` 超时后子进程被丢弃并重启，已加载的二进制状态需要重新 `open_binary`。
 
+## 适用边界（在一份 375 KB 的 PE 程序上实测）
+
+- **适合**：给一个已知地址问事——`procedure_info` / `procedure_pseudo_code` / `xrefs` / `search_strings` 之后跟 `xrefs`。单点、可验证。
+- **不适合**：把整个二进制摸一遍。`list_procedures` 一次返回 209,174 字符、`inspect_native_load_image` 31,351 字符，必然被 `maxBytes` 截断；
+  要枚举函数/字符串，本地 `analyzeHeadless` + 脚本落盘更划算。
+- 每个 REA 响应外层还套 3–5 KB 的 evidence 信封（`analysis_profile` / `limitations` / 证据 id），那是 REA 自己的形状，不是本插件加的；
+  设 `maxBytes` 时要按「信封 + 正文」估。
+
+REA 侧已知陷阱（不是本插件的问题，但会让人误判成「目标没打开」或「地址错」）：
+
+- `open_binary` 成功后，`current_document` 仍可能报 `target_unavailable` —— headless 会话与 app 级状态不同步。
+- `procedure_pseudo_code` 的 `0x…` 若不是函数入口，会退化成 file offset，报 `File offset … has no loaded source mapping`；
+  先 `procedure_info` 拿函数入口再反编译。
+- `inspect_pcap_client` 需要 `tshark` 在 PATH，否则 `capability_unavailable`（Win32 87）。
+
 ## 排错
 
 | 现象 | 原因与处理 |
@@ -115,6 +130,7 @@ cd dsh-rea-dispatcher
 node test/resolver.mjs    # 路径派生、白名单、渲染与截断（无需 REA）
 node test/smoke.mjs       # 需要本机已装 rea-agents + 可用的 Ghidra 通路
 node test/ab-surface.mjs  # 复算上面那张体积对照表（需要本机工具表缓存）
+node test/start-failure.mjs  # 子进程启动失败后不会假死（两次都快速失败，不挂 5 s）
 ```
 
 ## 问题反馈
