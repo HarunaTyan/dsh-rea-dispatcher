@@ -29,11 +29,14 @@ REA 的 `tools/list` 是 **3,158,415 字节**（207 个工具）。直接挂 MCP
 # 1) 先装 REA 本体（本插件不代装引擎）
 npm i -g rea-agents
 
-# 2) 装本插件（bundle 会自己插进 profile）
-dsh plugin --profile <profile> add dsh-rea-dispatcher
+# 2) 装本插件（bundle 会自己插进 profile，无需构建授权）
+dsh plugin --profile <profile> add github:HarunaTyan/dsh-rea-dispatcher
 ```
 
 装完用宿主的 `plugin_manager set_bundle dsh-rea-dispatcher enabled=true` 挂载即可（无需重启）。
+
+实测（空 profile）：上面第二条命令装出 `+ dsh-rea-dispatcher 1.0.0`，`--dump-config` 里直接出现
+`- id: rea-dispatcher` 一行，不需要手写 patch。
 
 ## 前置条件
 
