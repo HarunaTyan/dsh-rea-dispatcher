@@ -79,6 +79,12 @@ check('dot segments are ignored', isAllowedCwd('D:/proj/./sub', ['D:/proj']))
 check('root allow list covers absolute paths', isAllowedCwd('/home/u/re', ['/']))
 check('empty allow entry never matches', !isAllowedCwd('D:/proj', ['']))
 
+check('dot-dot stops at a drive root', normalizePath('D:/proj/../../secret') === (process.platform === 'win32' ? 'd:/secret' : 'D:/secret'))
+check('UNC keeps its double slash', normalizePath('//server/share/x') === (process.platform === 'win32' ? '//server/share/x' : '//server/share/x'))
+check("root entry allows any absolute path", isAllowedCwd('D:/x', ['/']))
+check('drive root entry allows the whole drive', isAllowedCwd('D:/x/y', ['D:']))
+check('relative session cwd is never allowed', !isAllowedCwd('relative/dir', ['D:/proj']))
+
 // ---- result rendering ----------------------------------------------------
 const long = renderResult({ content: [{ type: 'text', text: 'x'.repeat(100) }] }, 10)
 check('truncation marks itself', long.truncated && long.total === 100 && long.text.includes('truncated'))

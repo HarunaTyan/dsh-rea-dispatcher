@@ -123,6 +123,8 @@ rea_call  name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
 - `open_binary` 成功后，`current_document` 仍可能返回 `target_unavailable`，因 app 级状态与 headless 会话不同步。
 - `procedure_pseudo_code` 的 `0x…` 不是函数入口时会退化为 file offset。
 - `inspect_pcap_client` 需要 `tshark` 在 PATH。
+- `open_binary` 可能接受非 PE 目标（如 `raw-binary + arm64`、ELF），但后续分析四个 provider 全拒；**打开成功不等于可分析**。
+- 同目录的 PDB 不会被导入：REA 不接受调用方指定的 PDB，函数仍显示为 `FUN_1400xxxxx`；要符号需本地 `analyzeHeadless` 或逐条 `set_address_name`。
 
 ## 排错
 
@@ -143,6 +145,8 @@ git clone https://github.com/HarunaTyan/dsh-rea-dispatcher && cd dsh-rea-dispatc
 node test/resolver.mjs     # 路径派生、白名单、渲染与截断、落盘
 node test/smoke.mjs        # 需已装 rea-agents：工具目录、三步链路、截断落盘
 node test/ab-surface.mjs   # 复算体积对照表
+node test/start-failure.mjs # 启动失败后能重启，而不是卡在超时
+node test/help-sample.mjs   # 打印 rea_help 的真实输出（需已装 rea-agents）
 ```
 
 问题请提交至 [GitHub Issues](https://github.com/HarunaTyan/dsh-rea-dispatcher/issues)，附 DSH 版本、`rea-agents` 版本、`rea doctor --json` 输出与报错原文。
