@@ -1,6 +1,6 @@
 # dsh-rea-dispatcher
 
-DeepSeek Harness 插件，将 REA（以 Ghidra 为后端的逆向 MCP 服务）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1 KB。
+DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（以 [Ghidra](https://ghidra-sre.org/) 为后端的逆向 MCP 服务，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1 KB。
 
 ## 它做什么
 
@@ -23,7 +23,7 @@ REA 的 `tools/list` 原始响应为 3,158,415 字节，共 207 个工具。直�
 
 ## 安装
 
-前置条件：DSH；Node.js；REA 本体（插件不代装引擎）；Ghidra 12.1.x 与 JDK 21（供需要引擎的工具使用）。
+前置条件：[DSH](https://github.com/deepseek-ai/deepseek-harness)；[Node.js](https://nodejs.org/)；[REA](https://github.com/morluto/rea) 本体（[npm `rea-agents`](https://www.npmjs.com/package/rea-agents)，插件不代装引擎）；[Ghidra](https://ghidra-sre.org/) 12.1.x 与 [JDK 21](https://adoptium.net/)（供需要引擎的工具使用）。
 
 ```bash
 npm i -g rea-agents
@@ -132,4 +132,4 @@ node test/ab-surface.mjs   # 复算体积对照表
 
 ## 许可
 
-MIT
+MIT。本插件与 REA、Ghidra、DSH 等项目无隶属关系，文中链接仅指向各项目的官方仓库或站点。
