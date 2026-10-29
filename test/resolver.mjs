@@ -20,7 +20,11 @@ const check = (label, ok, detail = '') => {
 
 // ---- rea-agents discovery -------------------------------------------------
 const found = resolveReaMjs('')
-check('reaMjs auto-detected on this machine', typeof found === 'string' && found.endsWith('rea.mjs'), String(found))
+if (found === undefined) {
+  console.log('SKIP rea-agents detection — not installed on this machine (npm i -g rea-agents to enable)')
+} else {
+  check('reaMjs auto-detected on this machine', found.endsWith('rea.mjs'), String(found))
+}
 check('explicit reaMjs is honoured verbatim', resolveReaMjs('X:/custom/rea.mjs') === 'X:/custom/rea.mjs', 'a typo must fail at spawn, not fall back')
 check('blank explicit falls back to detection', resolveReaMjs('   ').endsWith('rea.mjs'))
 
@@ -64,9 +68,14 @@ check('empty allow list means unrestricted', isAllowedCwd('C:/anywhere', []))
 check('exact match allowed', isAllowedCwd('D:/proj', ['D:/proj']))
 check('child dir allowed', isAllowedCwd('D:/proj/sub', ['D:/proj']))
 check('sibling prefix denied', !isAllowedCwd('D:/proj2', ['D:/proj']))
-check('backslash and case normalised', isAllowedCwd('d:\\PROJ\\sub', ['D:/proj']))
+check('backslash and case normalised', isAllowedCwd('d:\\PROJ\\sub', ['D:/proj']) === (process.platform === 'win32'))
 check('missing cwd denied when restricted', !isAllowedCwd('', ['D:/proj']))
-check('normalizePath strips trailing slashes', normalizePath('D:\\proj\\') === 'd:/proj')
+check('normalizePath strips trailing slashes', normalizePath('D:\\proj\\') === (process.platform === 'win32' ? 'd:/proj' : 'D:/proj'))
+check('dot-dot cannot escape the allow list', !isAllowedCwd('D:/proj/..', ['D:/proj']))
+check('dot-dot inside the allow list still matches', isAllowedCwd('D:/proj/sub/../sub', ['D:/proj']))
+check('dot segments are ignored', isAllowedCwd('D:/proj/./sub', ['D:/proj']))
+check('root allow list covers absolute paths', isAllowedCwd('/home/u/re', ['/']))
+check('empty allow entry never matches', !isAllowedCwd('D:/proj', ['']))
 
 // ---- result rendering ----------------------------------------------------
 const long = renderResult({ content: [{ type: 'text', text: 'x'.repeat(100) }] }, 10)

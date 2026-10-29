@@ -1,6 +1,6 @@
 {
   "name": "dsh-rea-dispatcher",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Exposes the 200+ REA (rea-agents) MCP tools to DeepSeek Harness three calls at a time — rea_tools → rea_help → rea_call — instead of mounting a multi-megabyte tool list into every request.",
   "type": "module",
   "license": "MIT",

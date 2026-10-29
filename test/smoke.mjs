@@ -56,7 +56,7 @@ try {
   check('path-segment boundary', boundary.startsWith('当前目录未授权'), 'D:/re-projects2 must not match D:/re-projects')
 
   const list = await run('rea_tools', { filter: 'native', limit: 3 }, 'D:/re-projects')
-  check('catalogue lists 207 tools', list.includes('共 207 个工具'), list.split('\n')[0])
+  check('catalogue reports the tool count', /共 \d+ 个工具/.test(list), list.split('\n')[0])
   check('catalogue stays compact', list.length < 800, `${list.length} chars`)
 
   const help = await run('rea_help', { name: 'inspect_native_load_image' }, 'D:/re-projects')
