@@ -1,144 +1,165 @@
 # dsh-rea-dispatcher
 
-把 [REA](https://github.com/morluto/rea)（rea-agents，Ghidra 反汇编后端）的 200+ 个 MCP 工具**分三段按需**暴露给 DeepSeek Harness：
+把一个「207 个工具、3.1 MB 工具表」的逆向 MCP 服务，折叠成 **3 个入口、约 1 KB 常驻上下文**。
 
-```
-rea_tools  → 工具名与标题（目录）
-rea_help   → 单个工具的说明 + 参数 schema
-rea_call   → 实际调用，参数原样透传
-```
-
-不把整份工具表塞进每次请求。
+一个 DeepSeek Harness 插件，包装 [REA](https://github.com/morluto/rea)（以 Ghidra 为后端的逆向 MCP 服务），只在真正调用时按需展开单个工具的 Schema。
 
 ## 为什么需要它
 
-REA 的 `tools/list` 是 **3,158,415 字节**（REA 6.7.0 的 207 个工具，原始响应实测）。直接挂 MCP 服务器，每个工具的定义都会进系统提示，序列化后（下表）比原始响应小，但仍是同一量级：
+REA 的 `tools/list` 原始响应是 **3,158,415 字节 / 207 个工具**。直挂 MCP 时，宿主会把每个工具的定义写进系统提示：
 
-| 接入方式 | 每次请求的工具表体积（估算） |
-| --- | --- |
-| 直接挂 REA MCP（207 工具） | 775,016 B ≈ 19–22 万 token |
-| 本插件（3 个工具） | 1,044 B |
+| 方案 | 工具数 | 进入上下文的部分 | 折算 token |
+| --- | --- | --- | --- |
+| 直挂 REA | 207 | 775,016 B（`{name, description, parameters}`） | 约 19–22 万 |
+| 挂本插件 | 3 | 1,044 B | 忽略不计 |
 
-平均每个工具 3,744 B，最大的 `compare_web_captures` 单个就 166,651 B。口径说明：775,016 B 是按 `dsh-mcp-client` 的注册形状（`{name, description, parameters}`）对 REA 6.7.0 真实 207 份 schema 计算出来的**建模估算**，不是宿主运行时抓包；1,044 B 同理（`test/ab-surface.mjs` 可复算）。数量级差异不受口径影响。也就是说，直接挂载会在模型看到第一个字之前花掉整个上下文窗口。
+口径：775,016 B 是按 `dsh-mcp-client` 的注册形状、对 REA 6.7.0 真实的 207 份 schema 算出来的；3,158,415 B 是原始线上响应，含 outputSchema/注解等不会进上下文的字段（`test/ab-surface.mjs` 可复算）。
 
-本插件只在需要时取单个工具的 schema，`tools/list` 结果带版本号缓存在 `<DSH_HOME>/rea-dispatcher-cache.json`，升级 REA 后自动失效。
+直挂等于在模型读到第一个字之前吃掉大半个上下文窗口；不挂则 207 个工具一个都用不上。这个插件解决的就是这个两难。
 
-## 安装
+## 它怎么做到的
+
+不给模型全部定义，分三步，每次只给当前需要的那一片。
+
+| 步 | 工具 | 作用 | 返回 |
+| --- | --- | --- | --- |
+| ① | `rea_tools` | 列目录 | 工具名 + 标题，可按关键词筛 |
+| ② | `rea_help` | 看详情 | 这一个工具的必填项、已知陷阱、参数 Schema |
+| ③ | `rea_call` | 执行 | 参数原样透传给 REA |
+
+模型永远只看到 3 个入口；`rea_help` 一次只展开一个；`rea_call` 不加载任何额外定义。没有索引服务，没有额外依赖。
+
+## 装完怎么用
+
+**先装 REA 本体**（插件不代装引擎）：
 
 ```bash
-# 1) 先装 REA 本体（本插件不代装引擎）
 npm i -g rea-agents
-
-# 2) 装本插件（bundle 会自己插进 profile，无需构建授权）
-dsh plugin --profile <profile> add github:HarunaTyan/dsh-rea-dispatcher
 ```
 
-装完用宿主的 `plugin_manager set_bundle dsh-rea-dispatcher enabled=true` 挂载即可（无需重启）。
+**再装插件**（bundle 自己插进 profile，无需手改 patch）：
 
-实测（空 profile）：上面第二条命令装出 `+ dsh-rea-dispatcher 1.0.0`，`--dump-config` 里直接出现
-`- id: rea-dispatcher` 一行，不需要手写 patch。
+```bash
+dsh plugin --profile <你的profile> add github:HarunaTyan/dsh-rea-dispatcher
+```
 
-## 前置条件
+装完在市场里点启用，或让 AI 用宿主工具 `plugin_manager set_bundle dsh-rea-dispatcher enabled=true`；不用重启。`--profile <p> --dump-config` 里出现 `- id: rea-dispatcher` 即生效。
 
-| 依赖 | 说明 |
-| --- | --- |
-| `rea-agents` | 提供 `scripts/rea.mjs`（MCP 入口）。默认从全局 npm 目录探测，也可用 `reaMjs` / `REA_MJS` 指定绝对路径。 |
-| Ghidra 12.1.x | REA 的 Ghidra provider 要求；目录通过 `GHIDRA_INSTALL_DIR` 或 `config.ghidraDir` 给出。 |
-| JDK 21 | 通过 `JAVA_HOME` 或 `config.javaHome` 给出 —— 插件只把它注入子进程，不会改系统环境变量。 |
+**人这边**：不需要配置任何东西。默认 `cwdAllow: []`（不限制），引擎路径从 `GHIDRA_INSTALL_DIR` / `JAVA_HOME` 环境变量读。
 
-缺 **Ghidra/JDK** 时插件照常加载、`rea_tools` 能列目录，只有调用到需要引擎的工具才报 REA 自己的错误；缺 **rea-agents 本体** 时连 `rea_tools` 也会直接报一句可照抄的安装提示（工具名与标题就是它提供的）。
+**AI 那边**：什么都不用读。3 个工具的描述里已写明三步流程；第一次拉工具目录时，`rea_tools` 会在结果开头附两行用法与「默认不限制目录」的说明。你只要说一句：
 
-## 配置
+> 用 REA 分析 `<路径>`：先 rea_tools 找工具，rea_help 看参数，再 rea_call；不要猜工具名。
 
-全部可选，默认值都从环境派生，包里不含任何机器路径：
+## 三步调用长什么样
 
-| 键 | 默认 | 说明 |
-| --- | --- | --- |
-| `reaMjs` | `''` | `scripts/rea.mjs` 绝对路径。空 = 探测 `REA_MJS` → 已装 `rea-agents` → npm 全局前缀 |
-| `ghidraDir` | `''` | 注入子进程的 `GHIDRA_INSTALL_DIR`。空 = 用同名环境变量 |
-| `javaHome` | `''` | 注入 `JAVA_HOME` 并把其 `bin` 前置进 `PATH` |
-| `childCwd` | `''` | REA 子进程工作目录。空 = 系统临时目录 |
-| `cachePath` | `''` | 工具表缓存。空 = `<DSH_HOME>/rea-dispatcher-cache.json` |
-| `cwdAllow` | `[]` | 允许使用 `rea_*` 的会话目录白名单；空数组 = 不限制。非空时取不到会话目录即拒绝（不猜） |
-| `callTimeoutMs` | `300000` | 单次 `rea_call` 超时。**超时后子进程会被丢弃**，下一次调用重新握手（否则卡住的 Ghidra 任务会堵住后续调用） |
-| `listTimeoutMs` | `120000` | 握手与 `tools/list` 超时 |
-| `maxBytes` | `20000` | `rea_call` 返回文本上限（超出截断并标注）。`0`/负数按默认值处理，不是「不限」 |
-| `spill` | `true` | 结果超 `maxBytes` 时把**全文**落盘，只回路径 + 前 `maxBytes` 字符，用文件工具分段读 |
-| `spillDir` | `''` | 落盘目录。空 = `<DSH_HOME>/rea-spill` |
-| `spillKeep` | `50` | 落盘文件保留个数，超出按修改时间删最旧 |
-| `helpMaxChars` | `12000` | `rea_help` 返回上限（个别工具 schema 有 4 万字符）。超限时先压说明文字，schema 尽量保住结构 |
+```text
+rea_tools filter=image
+rea_help  name=inspect_native_load_image
+rea_call  name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
+```
 
-按 entry id 覆盖（profile 自己的 `cordis.patch.yml`）：
+`rea_help` 的头几行是你最需要的——必填项和已知陷阱，不用在长描述里翻：
+
+```text
+# procedure_pseudo_code
+标题：Procedure Pseudo Code
+必填：procedure
+⚠️ `0x…` 若不是函数入口会退化成 file offset；先 procedure_info 拿入口再调用
+```
+
+`rea_call` 对 REA 的错误原样透传，只在前面加一行标注，说明错误来自 REA 而不是调度层。
+
+## 配置（全部可选）
+
+默认值从环境派生，包里没有硬编码的机器路径。要覆盖就写进 profile 的 `cordis.patch.yml`，按 entry id `rea-dispatcher`：
 
 ```yaml
 - id: rea-dispatcher
-  name: "dsh-rea-dispatcher"
   config:
     cwdAllow: ['D:/re-projects']
     ghidraDir: "D:/tools/ghidra_12.1.4_PUBLIC"
     javaHome: "D:/tools/JDK21"
+    callTimeoutMs: 600000
+    maxBytes: 40000
 ```
 
-注意 patch 是**整体替换** `config`，不是深合并，所以要用到的键要一次给全。
+⚠️ patch 里的 `config` 是**整体替换**，不是深合并：写了这个块就要把用到的键一次写全，否则未写的键回退默认值。这是 DSH patch 的行为。
 
-`cwdAllow` 按路径段比较（`/re/proj2` 不会被 `/re/proj` 放行），比较前折叠 `.`/`..`（`D:/proj/..` 不会被 `D:/proj` 放行），Windows 上忽略大小写、其他平台区分大小写，`['/']` 表示整个文件系统。
+| 键 | 作用 | 默认 |
+| --- | --- | --- |
+| `ghidraDir` | 注入 `GHIDRA_INSTALL_DIR` | 同名环境变量 |
+| `javaHome` | 注入 `JAVA_HOME`，并把其 `bin` 前置进 PATH（要 JDK 21，17 不够） | 同名环境变量 |
+| `reaMjs` | REA 的 `scripts/rea.mjs` 绝对路径 | 自动探测（`REA_MJS` → 已装 `rea-agents` → npm 全局） |
+| `childCwd` | REA 子进程工作目录 | 系统临时目录 |
+| `cachePath` | 工具表缓存 | `<DSH_HOME>/rea-dispatcher-cache.json` |
+| `spillDir` | 超限结果全文落盘目录 | `<DSH_HOME>/rea-spill` |
+| `cwdAllow` | 会话目录白名单 | `[]`（不限制，见下） |
+| `callTimeoutMs` / `listTimeoutMs` | 单次调用 / 握手超时 | 300000 / 120000 ms |
+| `maxBytes` | `rea_call` 返回上限（`0`/负 = 按默认值，不是「不限」） | 20000 |
+| `spill` / `spillKeep` | 超限落盘 / 保留份数 | `true` / 50 |
+| `helpMaxChars` | `rea_help` 返回上限 | 12000 |
 
-注意边界：`cwdAllow` 只约束**会话目录**，不约束 `rea_call` 的 `arguments`（比如 `open_binary` 的 `path`）——REA 工具本身能读任意路径的二进制。要更强隔离，请让 REA 子进程跑在受限账户/沙箱里。
+引擎缺失不会让插件挂掉：`rea_tools` 照样列目录，只有调用到需要引擎的工具才回 REA 自己的错误。缺 `rea-agents` 本体则会直接给一句可照抄的安装提示。
 
-## 用法
+工具表按已装 `rea-agents` 的版本号缓存，升级 REA 自动失效；读不到版本号（自定义 `reaMjs` 不在包内）时不读也不写缓存，每次重新拉一次（约 3 MB / 2–3 s）。
 
+## 结果太长会不会丢
+
+不会。超过 `maxBytes` 时正文截断，**全文落盘**，尾部给出路径：
+
+```text
+[全文已落盘：C:\Users\you\.dsh\rea-spill\list_procedures-2026-10-29T18-57-38.txt
+（209,174 字符 / 8,412 行）。用 ops_read_files 或 ops_grep 分段读，不必再调一次 rea_call]
 ```
-rea_tools filter=image            # 找名字
-rea_help name=inspect_native_load_image   # 看参数（首行给必填项与已知陷阱）
-rea_call name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
-```
 
-`rea_call` 对 REA 的错误原样透传（例如 `target_unavailable`）：正文一字不改，只在前面加一行说明这属于 REA 侧错误。
+只读需要的行区间，不要整份读回来 —— 否则等于把上下文问题换个地方发生。
 
-两处与缓存/超时相关的实测行为：工具表按已装 `rea-agents` 的版本号做缓存键，读不到版本号（自定义 `reaMjs` 不在包内）时**不写也不读缓存**，每次调用都重新拉 `tools/list`（约 3 MB / 2–3 s）；`rea_call` 超时后子进程被丢弃并重启，已加载的二进制状态需要重新 `open_binary`。
+REA 本身不截断（`list_procedures` 一次就是 209K），宿主 DSH 也没有统一的工具返回上限；截断与落盘都是本插件的策略。
 
-## 适用边界（在一份 375 KB 的 PE 程序上实测）
+## 安全边界：cwdAllow
 
-- **适合**：给一个已知地址问事——`procedure_info` / `procedure_pseudo_code` / `xrefs` / `search_strings` 之后跟 `xrefs`。单点、可验证。
-- **不适合**：把整个二进制摸一遍。`list_procedures` 一次返回 209,174 字符、`inspect_native_load_image` 31,351 字符，会被 `maxBytes` 截断——**但不会丢**：全文默认落盘到 `<DSH_HOME>/rea-spill/`，返回里给出路径与行数，模型用 `ops_read_files`/`ops_grep` 分段读。真要大范围枚举，本地 `analyzeHeadless` + 脚本仍然更省 token。
-- 每个 REA 响应外层还套 3–5 KB 的 evidence 信封（`analysis_profile` / `limitations` / 证据 id），那是 REA 自己的形状，不是本插件加的；
-  设 `maxBytes` 时要按「信封 + 正文」估。
+- **空数组（默认）**：不限制，任何目录下的会话都能调用。
+- **非空**：按路径段比较，`/re/proj2` 不会被 `/re/proj` 放行；比较前折叠 `.` 和 `..`；Windows 忽略大小写；`['/']` 放行整个文件系统；取不到会话目录时**拒绝**而不是猜。
+- ⚠️ 它只约束**会话目录**，不约束 `rea_call` 的 `arguments` 里的路径：`open_binary` 仍能读任意路径的二进制。要更强隔离，把 REA 子进程跑在受限账户/沙箱里。
 
-REA 侧已知陷阱（不是本插件的问题，但会让人误判成「目标没打开」或「地址错」）：
+## 适用与不适用
 
-- `open_binary` 成功后，`current_document` 仍可能报 `target_unavailable` —— headless 会话与 app 级状态不同步。
-- `procedure_pseudo_code` 的 `0x…` 若不是函数入口，会退化成 file offset，报 `File offset … has no loaded source mapping`；
-  先 `procedure_info` 拿函数入口再反编译。
-- `inspect_pcap_client` 需要 `tshark` 在 PATH，否则 `capability_unavailable`（Win32 87）。
+**适合**：单点、可验证的查询（伪代码、交叉引用、字符串、导入导出表）；在对话里逐步缩小范围的探索。全量枚举拿得到，但要靠落盘文件分页读。
+
+**不适合**：需要长事务、多轮保持同一二进制状态的深度分析 —— `callTimeoutMs` 一到子进程被丢弃，`open_binary` 的状态要重做；大规模枚举本地 `analyzeHeadless` + 脚本更省。
+
+REA 侧还有几个会让人误判的陷阱（不是本插件的问题）：`open_binary` 成功后 `current_document` 仍可能报 `target_unavailable`（app 级状态与 headless 会话不同步）；`procedure_pseudo_code` 的 `0x…` 若不是函数入口会退化成 file offset；`inspect_pcap_client` 需要 `tshark` 在 PATH。
+
+## 设计取舍
+
+- **不代装 REA**：只管调度，引擎版本你自己定；代价是安装多一步，好处是升级 REA 不绑插件版本。
+- **不深合并 config**：跟随 DSH patch 机制，行为可预测；代价是覆盖时要写全。
+- **cwdAllow 只做会话级**：不在 `arguments` 上做路径拦截，因为需要理解每个工具的路径语义，容易误伤；强隔离交给沙箱。
+- **超时即丢子进程**：逆向会话状态复杂，强行复用的不确定性比重新握手更麻烦。
 
 ## 排错
 
-| 现象 | 原因与处理 |
+| 现象 | 处理 |
 | --- | --- |
-| `未找到 rea-agents 的 MCP 入口` | 没装或不在探测路径内：`npm i -g rea-agents`，或设 `reaMjs` / `REA_MJS` |
+| `未找到 rea-agents 的 MCP 入口` | `npm i -g rea-agents`，或设 `reaMjs` / `REA_MJS` |
 | `当前目录未授权` | 会话 cwd 不在 `cwdAllow` 里；改配置或在允许的目录开会话 |
-| `target_format_unsupported` | 平台限制，见下 |
-| Ghidra 报 Java 版本不足 | `javaHome` / `JAVA_HOME` 指向 JDK 21（系统 PATH 上的 17 不够） |
-
-**已实测的平台边界**：Windows 上 REA 6.7.0 的 Ghidra provider 只接受 **native PE** 与显式 raw 6502。ELF（例如 PS4 `eboot_decrypted.bin`）能 `open_binary`，但深分析一律返回 `target_format_unsupported` —— 这是 REA 的限制，不是本插件的。
+| REA 报 Java 版本不足 | `javaHome` / `JAVA_HOME` 指向 JDK 21（PATH 上的 17 不够） |
+| `target_format_unsupported` | Windows 上 Ghidra provider 只吃 native PE 与 raw 6502；ELF 能 `open_binary` 但深分析不行 |
+| `current_document` 报 "No app is open" | REA 侧 app 级状态与 headless 会话不同步，不是目标没打开 |
+| `inspect_pcap_client` 报 `capability_unavailable` | 需要 `tshark` 在 PATH |
 
 ## 开发
 
-这些脚本在**仓库里**，`npm` 包不含 `test/`（`files` 字段只带运行时需要的文件），所以先 clone：
+测试只能在仓库里跑（npm 包不含 `test/`）：
 
 ```bash
-git clone https://github.com/HarunaTyan/dsh-rea-dispatcher
-cd dsh-rea-dispatcher
-node test/resolver.mjs    # 路径派生、白名单、渲染与截断（无需 REA）
-node test/smoke.mjs       # 需要本机已装 rea-agents + 可用的 Ghidra 通路
-node test/ab-surface.mjs  # 复算上面那张体积对照表（需要本机工具表缓存）
-node test/start-failure.mjs  # 子进程启动失败后不会假死（两次都快速失败，不挂 5 s）
+git clone https://github.com/HarunaTyan/dsh-rea-dispatcher && cd dsh-rea-dispatcher
+node test/resolver.mjs     # 路径派生、白名单、渲染与截断、落盘（无需 REA）
+node test/smoke.mjs        # 真跑 REA：207 工具、三步链路、截断落盘（需已装 rea-agents）
+node test/ab-surface.mjs   # 复算上面那张体积对照表
 ```
-
-## 问题反馈
-
-用 [GitHub Issues](https://github.com/HarunaTyan/dsh-rea-dispatcher/issues) 提，附上 DSH 版本、`rea-agents` 版本、`rea doctor --json` 的输出和报错原文。个人项目，尽力而为地修。
 
 ## 许可
 
-MIT。
+MIT
