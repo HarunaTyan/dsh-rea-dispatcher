@@ -1,6 +1,6 @@
 {
   "name": "dsh-rea-dispatcher",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Wraps REA's 200+ reverse-engineering MCP tools (Ghidra / Hopper / IDA backends) into three calls for DeepSeek Harness — rea_tools → rea_help → rea_call — instead of a multi-megabyte tool list in every request.",
   "type": "module",
   "license": "MIT",
