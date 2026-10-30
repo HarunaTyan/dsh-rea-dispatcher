@@ -1,7 +1,7 @@
 // Environment-derived defaults and pure helpers: no REA server needed, no network.
 //   node test/resolver.mjs
 import { join } from 'node:path'
-import { domainSummary, isSessionLost, requiredParams, spillText, toolWarnings } from '../lib/index.js'
+import { domainSummary, isSessionLost, requiredParams, spillText, toolWarnings } from '../lib/pure.js'
 import { tmpdir } from 'node:os'
 import { readdir, rm } from 'node:fs/promises'
 import {
@@ -12,7 +12,7 @@ import {
   resolveJavaHome,
   resolveReaMjs,
 } from '../lib/rea-client.js'
-import { isAllowedCwd, normalizePath, renderResult } from '../lib/index.js'
+import { isAllowedCwd, normalizePath, renderResult } from '../lib/pure.js'
 
 const failures = []
 const check = (label, ok, detail = '') => {

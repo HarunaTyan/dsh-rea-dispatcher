@@ -1,6 +1,6 @@
 # dsh-rea-dispatcher
 
-DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（逆向 MCP 服务，后端含 [Ghidra](https://ghidra-sre.org/)、[Hopper](https://www.hopperapp.com/)、[IDA](https://hex-rays.com/ida-pro/)，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1.4 KB。
+DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（逆向 MCP 服务，后端含 [Ghidra](https://ghidra-sre.org/)、[Hopper](https://www.hopperapp.com/)、[IDA](https://hex-rays.com/ida-pro/)，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1.4 KB（1,375 字符 / 2,023 字节）。
 
 ## 它做什么
 
@@ -9,9 +9,11 @@ REA 的 `tools/list` 原始响应为 3,158,415 字节，共 207 个工具。直�
 | 接入方式 | 工具数 | 进入上下文的体积 | 折算 token |
 | --- | --- | --- | --- |
 | 直接挂载 REA | 207 | 775,016 B（`{name, description, parameters}`） | 约 19–22 万 |
-| 本插件 | 3 | 1,358 B | 可忽略 |
+| 本插件 | 3 | 1,375 字符 / 2,023 B | 可忽略 |
 
 > 775,016 B 按 `dsh-mcp-client` 的注册形状，对 REA 6.7.0 的 207 份 schema 计算；3,158,415 B 为线上原始响应，含 outputSchema、注解等不进入上下文的字段。
+>
+> 体积同时给字符数与 UTF-8 字节数：折算 token 按字节算，别把字符数当字节数。
 >
 > 复算脚本见 `test/ab-surface.mjs`。
 

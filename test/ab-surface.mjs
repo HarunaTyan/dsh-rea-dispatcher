@@ -22,6 +22,7 @@ const mcpTable = catalog.tools.map((tool) => ({
   parameters: tool.inputSchema ?? {},
 }))
 const mcpJson = JSON.stringify(mcpTable)
+const mcpBytes = Buffer.byteLength(mcpJson)
 const perTool = catalog.tools.map((tool, index) => JSON.stringify(mcpTable[index]).length)
 
 // ---- B: our dispatcher ----------------------------------------------------
@@ -55,7 +56,9 @@ console.log('A  largest 3         ', [...catalog.tools]
   .slice(0, 3)
   .map((entry) => `${entry.name}=${entry.bytes}B`)
   .join(', '))
-console.log('B  our dispatcher    ', oursJson.length, 'B ≈', toks(oursJson.length), `(${ours.length} tools)`)
+const ourChars = oursJson.length
+const ourBytes = Buffer.byteLength(oursJson)
+console.log('B  our dispatcher    ', ourChars, 'chars /', ourBytes, 'bytes ≈', toks(ourBytes), `(${ours.length} tools)`)
 console.log('ratio A/B            ', `${(mcpJson.length / oursJson.length).toFixed(0)}×`)
 
 // Projection to the pinned 229-tool release (dsh-plugin-rea pins rea-agents 6.8.0).
