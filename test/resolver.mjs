@@ -1,7 +1,7 @@
 // Environment-derived defaults and pure helpers: no REA server needed, no network.
 //   node test/resolver.mjs
 import { join } from 'node:path'
-import { isSessionLost, requiredParams, spillText, toolWarnings } from '../lib/index.js'
+import { domainSummary, isSessionLost, requiredParams, spillText, toolWarnings } from '../lib/index.js'
 import { tmpdir } from 'node:os'
 import { readdir, rm } from 'node:fs/promises'
 import {
@@ -88,6 +88,12 @@ check('relative session cwd is never allowed', !isAllowedCwd('relative/dir', ['D
 check('session loss detected', isSessionLost({ isError: true, content: [{ type: 'text', text: 'target_unavailable: No app is open' }] }))
 check('normal result is not a session loss', !isSessionLost({ isError: false, content: [{ type: 'text', text: 'ok' }] }))
 check('plain error is not a session loss', !isSessionLost({ isError: true, content: [{ type: 'text', text: 'unsupported binary format' }] }))
+
+check('domain summary counts hits', domainSummary([
+  { name: 'list_procedures', title: 'Native', description: '' },
+  { name: 'inspect_pcap_client', title: 'Pcap', description: '' },
+  { name: 'jadx_decompile', title: 'APK', description: '' },
+]).startsWith('native 1'), domainSummary([{ name: 'x', title: '', description: '' }]))
 
 // ---- result rendering ----------------------------------------------------
 const long = renderResult({ content: [{ type: 'text', text: 'x'.repeat(100) }] }, 10)

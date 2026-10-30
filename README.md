@@ -1,6 +1,6 @@
 # dsh-rea-dispatcher
 
-DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（以 [Ghidra](https://ghidra-sre.org/) 为后端的逆向 MCP 服务，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1 KB。
+DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（逆向 MCP 服务，后端含 [Ghidra](https://ghidra-sre.org/)、[Hopper](https://www.hopperapp.com/)、[IDA](https://hex-rays.com/ida-pro/)，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1 KB。
 
 ## 它做什么
 
@@ -19,7 +19,7 @@ REA 的 `tools/list` 原始响应为 3,158,415 字节，共 207 个工具。直�
 
 | 工具 | 作用 | 返回 |
 | --- | --- | --- |
-| `rea_tools` | 列出工具名与标题，支持关键词筛选 | 目录 |
+| `rea_tools` | 列出工具名与标题，支持关键词筛选；附一行域分布（native / web / apk …） | 目录 |
 | `rea_help` | 单个工具的必填项、已知陷阱、参数 Schema | 该工具的说明 |
 | `rea_call` | 调用工具，参数原样透传 | REA 的原始结果 |
 
