@@ -123,6 +123,7 @@ REA 的会话不跨轮（上一轮 `open_binary` 成功，下一轮仍可能报 
 
 **REA 侧限制**（非本插件行为）
 
+- 宿主版本：`engines.dsh` 与 peer 区间是 `>=0.2.1-rc.1 <0.3.0-0`。npm 的 SemVer 规则下，预发布版本必须与区间里某个比较器同元组才算满足 ⇒ **0.2.2-rc.x 这类后续预发布不会被该区间接受**（`^0.2.1-0` 同样不接受，实测）。要支持新宿主预发布，只能发版扩区间，别指望改写法解决。
 - Windows 上 Ghidra provider 仅接受 native PE 与显式 raw 6502；ELF 可 `open_binary`，深分析返回 `target_format_unsupported`。
 - `open_binary` 成功后，`current_document` 仍可能返回 `target_unavailable`，因 app 级状态与 headless 会话不同步。
 - `procedure_pseudo_code` 的 `0x…` 不是函数入口时会退化为 file offset。
