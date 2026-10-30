@@ -1,6 +1,6 @@
 # dsh-rea-dispatcher
 
-DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（逆向 MCP 服务，后端含 [Ghidra](https://ghidra-sre.org/)、[Hopper](https://www.hopperapp.com/)、[IDA](https://hex-rays.com/ida-pro/)，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1.2 KB。
+DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（逆向 MCP 服务，后端含 [Ghidra](https://ghidra-sre.org/)、[Hopper](https://www.hopperapp.com/)、[IDA](https://hex-rays.com/ida-pro/)，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1.4 KB。
 
 ## 它做什么
 
@@ -9,7 +9,7 @@ REA 的 `tools/list` 原始响应为 3,158,415 字节，共 207 个工具。直�
 | 接入方式 | 工具数 | 进入上下文的体积 | 折算 token |
 | --- | --- | --- | --- |
 | 直接挂载 REA | 207 | 775,016 B（`{name, description, parameters}`） | 约 19–22 万 |
-| 本插件 | 3 | 1,248 B | 可忽略 |
+| 本插件 | 3 | 1,358 B | 可忽略 |
 
 > 775,016 B 按 `dsh-mcp-client` 的注册形状，对 REA 6.7.0 的 207 份 schema 计算；3,158,415 B 为线上原始响应，含 outputSchema、注解等不进入上下文的字段。
 >
@@ -19,7 +19,7 @@ REA 的 `tools/list` 原始响应为 3,158,415 字节，共 207 个工具。直�
 
 | 工具 | 作用 | 返回 |
 | --- | --- | --- |
-| `rea_tools` | 列出工具名与标题，支持关键词筛选；附一行域分布（native / web / apk …） | 目录 |
+| `rea_tools` | 按域分组列出工具名与标题；带 `filter` 时退化为平铺过滤结果 | 目录 |
 | `rea_help` | 单个工具的必填项、已知陷阱、参数 Schema | 该工具的说明 |
 | `rea_call` | 调用工具，参数原样透传 | REA 的原始结果 |
 
