@@ -7,10 +7,11 @@ DeepSeek Harness 插件。把 [REA](https://github.com/morluto/rea)（逆向 MCP
 | 接入方式 | 工具数 | 进入上下文 | 折算 token |
 | --- | --- | --- | --- |
 | 直接挂载 REA | 207 | 775,016 B | 约 19 万至 22 万 |
-| 本插件（默认） | 9 | 3,401 字符 / 5,313 B | 约 1.3 K |
-| 本插件（`domainTools: false`） | 3 | 1,478 字符 / 2,204 B | 可忽略 |
+| 本插件（默认） | 9 | 3,404 字符 / 5,322 B | 约 1.3 K |
+| 本插件（`domainTools: false`） | 3 | 1,481 字符 / 2,213 B | 可忽略 |
 
-> 数字按 `{name, description, parameters}` 序列化后计算，字符数与 UTF-8 字节数分开给。复算脚本 `test/ab-surface.mjs`。
+> 数字按 `{name, description, parameters}` 序列化后计算，字符数与 UTF-8 字节数分开给。
+> 离线复算：`node test/ab-surface.mjs`（用 `test/fixtures/` 里的目录快照，不需要装 REA）；B 侧数字是宿主编译产物，装了宿主包才会打印。
 
 ## 工具
 
@@ -43,7 +44,7 @@ dsh plugin --profile <profile> add github:HarunaTyan/dsh-rea-dispatcher
 
 > 引擎路径默认读 `GHIDRA_INSTALL_DIR` 与 `JAVA_HOME`。没配也能加载并列目录，只有用到引擎的工具会报 REA 自己的错。缺 `rea-agents` 时返回可直接执行的安装提示。
 
-> 宿主版本区间是 `>=0.2.1-rc.1 <0.3.0-0`。按 npm 的 SemVer 规则，`0.2.2-rc.x` 这类后续预发布不在区间内，要支持只能发版扩区间。
+> 宿主版本区间 `>=0.2.1-rc.1 <0.3.0-0`；`0.2.2-rc.x` 这类后续预发布不在区间内，需要时发版扩区间。
 
 ## 使用
 
