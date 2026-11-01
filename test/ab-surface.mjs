@@ -61,6 +61,21 @@ const ourBytes = Buffer.byteLength(oursJson)
 console.log('B  our dispatcher    ', ourChars, 'chars /', ourBytes, 'bytes ≈', toks(ourBytes), `(${ours.length} tools)`)
 console.log('ratio A/B            ', `${(mcpJson.length / oursJson.length).toFixed(0)}×`)
 
+// Same measurement with the domain entry points switched off (3 commands).
+const offRegistry = new Map()
+apply(
+  {
+    tools: { register: (d) => (offRegistry.set(d.name, d), () => offRegistry.delete(d.name)) },
+    effect: (b) => b(),
+  },
+  Config({ domainTools: false }),
+)
+const offJson = JSON.stringify(
+  [...offRegistry.values()].map((d) => ({ name: d.name, description: d.description, parameters: d.parameters })),
+)
+console.log('B  domainTools:false  ', offJson.length, 'chars /', Buffer.byteLength(offJson), 'bytes', `(${offRegistry.size} tools)`)
+console.log('ratio A/B (3 tools)   ', `${(mcpJson.length / offJson.length).toFixed(0)}×`)
+
 // Projection to the pinned 229-tool release (dsh-plugin-rea pins rea-agents 6.8.0).
 const projected = Math.round((mcpJson.length / catalog.tools.length) * 229)
 console.log('A  projected 229 tool', projected, kb(projected), '≈', toks(projected))

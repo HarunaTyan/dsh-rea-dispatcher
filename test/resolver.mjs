@@ -1,7 +1,8 @@
 // Environment-derived defaults and pure helpers: no REA server needed, no network.
 //   node test/resolver.mjs
 import { join } from 'node:path'
-import { domainSummary, isSessionLost, requiredParams, spillText, toolWarnings } from '../lib/pure.js'
+import { domainSummary, isSessionLost, renderDomainCatalog, requiredParams, spillText, toolWarnings } from '../lib/pure.js'
+import { DOMAIN_META, domainEntries, domainOf, domainToolName } from '../lib/pure.js'
 import { tmpdir } from 'node:os'
 import { readdir, rm } from 'node:fs/promises'
 import {
@@ -112,6 +113,41 @@ check('file-offset trap detected', trap.length === 1 && trap[0].includes('file o
 check('absolute path requirement detected', toolWarnings('path must be an absolute path').some((w) => w.includes('绝对路径')))
 check('external tool requirement detected', toolWarnings('requires tshark on PATH').some((w) => w.includes('tshark')))
 check('no warnings for a plain description', toolWarnings('Lists procedures.').length === 0)
+
+// ---- domain entry points and the read-only domain body --------------------
+const sample = [
+  { name: 'open_binary', title: 'Open a binary' },
+  { name: 'procedure_pseudo_code', title: 'Pseudo-code of a procedure' },
+  { name: 'compare_web_captures', title: 'Compare captures' },
+  { name: 'jadx_decompile_class', title: 'Decompile an Android class' },
+  { name: 'start_adb_app', title: 'Start an app over adb' },
+  { name: 'frida_attach', title: 'Attach Frida' },
+  { name: 'inspect_plist', title: 'Inspect a plist' },
+  { name: 'decode_6502_rom', title: 'Decode a 6502 ROM' },
+  { name: 'start_gdb_session', title: 'Start gdb' },
+  { name: 'get_session_info', title: 'Session info' },
+]
+const total = Object.keys(DOMAIN_META).reduce((sum, key) => sum + domainEntries(sample, key).length, 0)
+check('domains partition the catalogue', total === sample.length, `${total} vs ${sample.length}`)
+check('native classification', domainEntries(sample, 'native').map((t) => t.name).join(',') === 'open_binary,procedure_pseudo_code,start_gdb_session')
+check('web classification', domainEntries(sample, 'web').map((t) => t.name).join(',') === 'compare_web_captures')
+check('apk classification keeps adb', domainEntries(sample, 'apk').map((t) => t.name).join(',') === 'jadx_decompile_class,start_adb_app')
+check('mobile classification', domainEntries(sample, 'mobile').map((t) => t.name).join(',') === 'frida_attach,inspect_plist')
+check('firmware classification', domainEntries(sample, 'firmware').map((t) => t.name).join(',') === 'decode_6502_rom')
+check('unmatched entries fall into 通用', domainOf({ name: 'get_session_info', title: 'Session info' }) === '通用')
+check('six distinct domain tools', new Set(Object.keys(DOMAIN_META).map(domainToolName)).size === 6)
+check('通用 maps to rea_general', domainToolName('通用') === 'rea_general')
+
+const wide = Array.from({ length: 50 }, (_, i) => ({ name: `native_tool_${i}`, title: 'Native tool' }))
+const cut = renderDomainCatalog(wide, 'native', { reaVersion: '9.9.9', limit: 5 })
+check('domain body caps at the limit', cut.split('\n').length <= 12, `${cut.split('\n').length} lines`)
+check('domain body says how to narrow', cut.includes('…还有 45 个未列出') && cut.includes('加 filter'), cut.split('\n').pop())
+check('no phantom limit parameter', !cut.includes('提高 limit'))
+check('domain body declares itself read-only', cut.includes('只读清单，不执行任何工具'), cut.split('\n')[0])
+const miss = renderDomainCatalog(wide, 'native', { filter: 'zzz', limit: 5 })
+check('miss inside a domain points at rea_tools', miss.includes('本域没有匹配') && miss.includes('rea_tools filter="zzz"'))
+const general = renderDomainCatalog([{ name: 'get_session_info', title: 'Session info' }], '通用', { reaVersion: '9.9.9' })
+check('empty-ish domain still renders', general.includes('通用') && general.includes('get_session_info'), general.split('\n')[0])
 
 // ---- spill: oversized results land on disk instead of being lost ----------
 const spillDir = join(tmpdir(), 'rea-spill-test-' + process.pid)

@@ -1,79 +1,76 @@
 # dsh-rea-dispatcher
 
-DeepSeek Harness 插件，将 [REA](https://github.com/morluto/rea)（逆向 MCP 服务，后端含 [Ghidra](https://ghidra-sre.org/)、[Hopper](https://www.hopperapp.com/)、[IDA](https://hex-rays.com/ida-pro/)，npm 包名 `rea-agents`）的 207 个工具折叠为 3 个按需入口，常驻上下文约 1.4 KB（1,375 字符 / 2,023 字节）。
+DeepSeek Harness 插件。把 [REA](https://github.com/morluto/rea)（逆向 MCP 服务，npm 包 `rea-agents`，后端 [Ghidra](https://ghidra-sre.org/)、[Hopper](https://www.hopperapp.com/)、[IDA](https://hex-rays.com/ida-pro/)）的 207 个工具折叠成 3 条命令，另有 6 个只读域入口。常驻约 5 KB，直挂约 757 KB。
 
-## 它做什么
+## 体积
 
-REA 的 `tools/list` 原始响应为 3,158,415 字节，共 207 个工具。直接挂载时，宿主会把每个工具的定义写入系统提示。
-
-| 接入方式 | 工具数 | 进入上下文的体积 | 折算 token |
+| 接入方式 | 工具数 | 进入上下文 | 折算 token |
 | --- | --- | --- | --- |
-| 直接挂载 REA | 207 | 775,016 B（`{name, description, parameters}`） | 约 19–22 万 |
-| 本插件 | 3 | 1,375 字符 / 2,023 B | 可忽略 |
+| 直接挂载 REA | 207 | 775,016 B | 约 19 万至 22 万 |
+| 本插件（默认） | 9 | 3,401 字符 / 5,313 B | 约 1.3 K |
+| 本插件（`domainTools: false`） | 3 | 1,478 字符 / 2,204 B | 可忽略 |
 
-> 775,016 B 按 `dsh-mcp-client` 的注册形状，对 REA 6.7.0 的 207 份 schema 计算；3,158,415 B 为线上原始响应，含 outputSchema、注解等不进入上下文的字段。
->
-> 体积同时给字符数与 UTF-8 字节数：折算 token 按字节算，别把字符数当字节数。
->
-> 复算脚本见 `test/ab-surface.mjs`。
+> 数字按 `{name, description, parameters}` 序列化后计算，字符数与 UTF-8 字节数分开给。复算脚本 `test/ab-surface.mjs`。
 
-插件只暴露三个入口，按需展开。
+## 工具
 
-| 工具 | 作用 | 返回 |
-| --- | --- | --- |
-| `rea_tools` | 按域分组列出工具名与标题；带 `filter` 时退化为平铺过滤结果 | 目录 |
-| `rea_help` | 单个工具的必填项、已知陷阱、参数 Schema | 该工具的说明 |
-| `rea_call` | 调用工具，参数原样透传 | REA 的原始结果 |
+| 工具 | 作用 |
+| --- | --- |
+| `rea_tools` | 列工具名与标题，按域分组，支持 `filter` |
+| `rea_help` | 单个工具的必填项、已知陷阱、参数 schema |
+| `rea_call` | 调用工具，参数原样透传 |
+| `rea_native` `rea_web` `rea_apk` `rea_mobile` `rea_firmware` `rea_general` | 只读域清单，只列本域工具 |
+
+域入口只列名字，不执行。执行一律走 `rea_call`。
 
 ## 安装
 
-安装前需自行准备以下依赖，插件不代装引擎。
+先自备依赖，插件不代装引擎。
 
 | 依赖 | 用途 |
 | --- | --- |
-| [DSH](https://github.com/deepseek-ai/deepseek-harness) | 宿主 |
-| [Node.js](https://nodejs.org/) | 运行 REA 的 MCP 入口 |
-| [REA](https://github.com/morluto/rea)，npm [`rea-agents`](https://www.npmjs.com/package/rea-agents) | 提供 207 个逆向工具 |
-| [Ghidra](https://ghidra-sre.org/) 12.1.x、[JDK 21](https://adoptium.net/) | 供需要引擎的工具使用 |
+| DSH | 宿主 |
+| Node.js 22 或 24 | 运行 REA 的 MCP 入口 |
+| rea-agents | 提供 207 个逆向工具 |
+| Ghidra 12.1.x 与 JDK 21 | 供需要引擎的工具使用 |
 
 ```bash
 npm i -g rea-agents
 dsh plugin --profile <profile> add github:HarunaTyan/dsh-rea-dispatcher
 ```
 
-安装后在市场启用，或由 AI 侧调用宿主工具 `plugin_manager set_bundle dsh-rea-dispatcher enabled=true`，无需重启。
+装好后在市场启用，或由 AI 侧调用 `plugin_manager set_bundle dsh-rea-dispatcher enabled=true`，无需重启。`dsh --profile <profile> --dump-config` 里出现 `- id: rea-dispatcher` 即生效。
 
-`dsh --profile <profile> --dump-config` 中出现 `- id: rea-dispatcher` 即生效。
+> 引擎路径默认读 `GHIDRA_INSTALL_DIR` 与 `JAVA_HOME`。没配也能加载并列目录，只有用到引擎的工具会报 REA 自己的错。缺 `rea-agents` 时返回可直接执行的安装提示。
 
-> 引擎路径默认读取 `GHIDRA_INSTALL_DIR` 与 `JAVA_HOME`。未配置时插件仍可加载并列出工具目录，仅调用到需要引擎的工具时报 REA 自身的错误；缺少 `rea-agents` 时返回可直接执行的安装提示。
+> 宿主版本区间是 `>=0.2.1-rc.1 <0.3.0-0`。按 npm 的 SemVer 规则，`0.2.2-rc.x` 这类后续预发布不在区间内，要支持只能发版扩区间。
 
 ## 使用
 
+这些工具由会话里的 AI 调用，不需要手敲。
+
 ```text
 rea_tools filter=image
-rea_help  name=inspect_native_load_image
-rea_call  name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
+rea_native filter=procedure
+rea_help name=inspect_native_load_image
+rea_call name=inspect_native_load_image arguments={"path":"C:/target/app.exe"}
 ```
 
-`rea_help` 首部即给出必填项与高代价陷阱，无需通读说明。
+`rea_help` 开头就是必填项与高代价陷阱：
 
 ```text
 # procedure_pseudo_code
-标题：Procedure Pseudo Code
 必填：procedure
 ⚠️ `0x…` 若不是函数入口会退化成 file offset；先 procedure_info 拿入口再调用
 ```
 
-`rea_call` 对 REA 的错误原样返回，仅在首行标注来源为 REA 而非调度层。
-REA 的会话不跨轮（上一轮 `open_binary` 成功，下一轮仍可能报 `No app is open`）：默认会自动重开并重试一次，输出里会标注；`autoReopen: false` 可关掉。 插件不参与反编译：同一函数双跑（本插件 vs 本地 analyzeHeadless）的 token 分布一致，质量就是 Ghidra 原生水平。
+REA 的错误原样返回，只在首行标注来源。REA 会话不跨轮：上一轮 `open_binary` 成功，下一轮仍可能报 `No app is open`。插件默认自动重开并重试一次，输出里会标注；`autoReopen: false` 关掉。
 
-> 返回超过 `maxBytes` 时正文截断、全文落盘，尾部给出文件路径与行数，可用 `ops_read_files` / `ops_grep` 分段读取。
->
-> REA 与宿主 DSH 均不限制返回体积，截断与落盘是本插件的策略。
+> 返回超过 `maxBytes` 时截断，全文落盘并在尾部给出路径与行数，可用 `ops_read_files` 或 `ops_grep` 分段读。
 
 ## 配置
 
-默认值由环境派生，包内不含机器路径。覆盖写在 profile 的 `cordis.patch.yml`，按 entry id `rea-dispatcher`。
+默认值都由环境派生，包内不含机器路径。覆盖写在 profile 的 `cordis.patch.yml`，entry id 是 `rea-dispatcher`。
 
 ```yaml
 - id: rea-dispatcher
@@ -85,79 +82,64 @@ REA 的会话不跨轮（上一轮 `open_binary` 成功，下一轮仍可能报 
     maxBytes: 40000
 ```
 
-> patch 中的 `config` 为整体替换而非深合并，覆盖时需一次写全所用键。
+> patch 里的 `config` 是整体替换，不是深合并；覆盖时要把用到的键一次写全。
 
 | 键 | 作用 | 默认 |
 | --- | --- | --- |
-| `reaMjs` | `scripts/rea.mjs` 绝对路径 | 自动探测：`REA_MJS` → 已装 `rea-agents` → npm 全局 |
+| `reaMjs` | `scripts/rea.mjs` 路径 | 自动探测 |
 | `ghidraDir` | 注入 `GHIDRA_INSTALL_DIR` | 同名环境变量 |
-| `javaHome` | 注入 `JAVA_HOME`，并将其 `bin` 前置到 PATH | 同名环境变量，须 JDK 21 |
-| `childCwd` | REA 子进程工作目录 | 系统临时目录 |
-| `cachePath` | 工具表缓存 | `<DSH_HOME>/rea-dispatcher-cache.json` |
+| `javaHome` | 注入 `JAVA_HOME`，并把其 `bin` 前置到 PATH | 同名环境变量 |
 | `cwdAllow` | 会话目录白名单 | `[]`，不限制 |
-| `callTimeoutMs` | 单次 `rea_call` 超时 | 300000 ms |
-| `listTimeoutMs` | 握手与 `tools/list` 超时 | 120000 ms |
-| `maxBytes` | `rea_call` 返回上限；`0` 或负值按默认处理 | 20000 |
-| `autoReopen` | 遇到「No app is open」时自动重新 `open_binary` 并重试一次 | `true` |
-| `spill` | 超限时是否落盘全文 | `true` |
-| `spillDir` | 落盘目录 | `<DSH_HOME>/rea-spill` |
-| `spillKeep` | 落盘文件保留数量，超出按修改时间删除 | 50 |
+| `maxBytes` | 单次返回上限 | 20000 |
+| `autoReopen` | 掉线自动重开一次 | `true` |
+| `spill` | 超限时落盘全文 | `true` |
+| `domainTools` | 是否注册 6 个域入口 | `true` |
+| `domainLimit` | 域清单条数上限 | 40 |
 | `helpMaxChars` | `rea_help` 返回上限 | 12000 |
-
-> 超时后子进程被丢弃，下次调用重新握手，已加载的二进制需重新 `open_binary`。
->
-> 工具表按已装 `rea-agents` 版本缓存；无法读取版本号时不读也不写缓存，每次重新拉取（约 3 MB，2–3 秒）。
+| `callTimeoutMs` | 单次调用超时 | 300000 |
+| `listTimeoutMs` | 握手与列目录超时 | 120000 |
 
 ## 边界
 
-**`cwdAllow`**
+**`cwdAllow` 只约束会话目录**
 
-- 空数组（默认）不限制。
-- 非空时按路径段比较（`/re/proj2` 不会被 `/re/proj` 放行），比较前折叠 `.` 与 `..`；Windows 忽略大小写；`['/']` 表示整个文件系统；无法取得会话目录时拒绝。
-- 仅约束会话目录，不约束 `rea_call` 的 `arguments` 中的路径。需要更强隔离时，应将 REA 子进程运行在受限账户或沙箱内。
+- 空数组不限制。非空时按路径段比较，`/re/proj2` 不会被 `/re/proj` 放行，比较前折叠 `.` 与 `..`，Windows 忽略大小写。
+- 取不到会话目录时拒绝。
+- 它不约束 `rea_call` 参数里的路径。要更硬的隔离，把 REA 子进程放进受限账户或沙箱。
 
-**适用性**
+**适合与不适合**
 
-- 适合单点、可验证的查询（伪代码、交叉引用、字符串、导入导出表）与逐步缩小范围的探索。
-- 不适合需要多轮维持同一二进制状态的深度分析（超时会丢弃子进程），也不适合大规模枚举（本地 `analyzeHeadless` 加脚本开销更低）。
+- 适合单点可验证的查询（伪代码、交叉引用、字符串、导入导出表）与逐步缩小范围的探索。
+- 不适合长时间维持同一二进制状态的深挖，超时会丢子进程；也不适合全量枚举。
 
-**REA 侧限制**（非本插件行为）
+## REA 侧限制
 
-- 宿主版本：`engines.dsh` 与 peer 区间是 `>=0.2.1-rc.1 <0.3.0-0`。npm 的 SemVer 规则下，预发布版本必须与区间里某个比较器同元组才算满足 ⇒ **0.2.2-rc.x 这类后续预发布不会被该区间接受**（`^0.2.1-0` 同样不接受，实测）。要支持新宿主预发布，只能发版扩区间，别指望改写法解决。
-- Windows 上 Ghidra provider 仅接受 native PE 与显式 raw 6502；ELF 可 `open_binary`，深分析返回 `target_format_unsupported`。
-- `open_binary` 成功后，`current_document` 仍可能返回 `target_unavailable`，因 app 级状态与 headless 会话不同步。
-- `procedure_pseudo_code` 的 `0x…` 不是函数入口时会退化为 file offset。
-- `inspect_pcap_client` 需要 `tshark` 在 PATH。
-- `open_binary` 可能接受非 PE 目标（如 `raw-binary + arm64`、ELF），但后续分析四个 provider 全拒；**打开成功不等于可分析**。
-- 同目录的 PDB 不会被导入：REA 不接受调用方指定的 PDB，函数仍显示为 `FUN_1400xxxxx`；要符号需本地 `analyzeHeadless` 或逐条 `set_address_name`。
+- **Windows 上只吃 native PE 与 raw 6502**。ELF 能 `open_binary`，深分析会被四个 provider 全拒，报 `target_format_unsupported`；打开成功不等于可分析。
+- **不带符号**。同目录 PDB 不会被导入，函数仍显示为 `FUN_1400xxxxx`，要符号得本地跑 `analyzeHeadless`。
 
 ## 排错
 
 | 现象 | 处理 |
 | --- | --- |
-| `未找到 rea-agents 的 MCP 入口` | 执行 `npm i -g rea-agents`，或配置 `reaMjs` / `REA_MJS` |
-| `当前目录未授权` | 会话目录不在 `cwdAllow` 内；调整配置或在允许的目录开会话 |
-| REA 报 Java 版本不足 | `javaHome` / `JAVA_HOME` 指向 JDK 21 |
-| `target_format_unsupported` | 目标格式不受支持，见上节 |
-| `capability_unavailable` | 缺少外部工具（如 `tshark`） |
+| `未找到 rea-agents 的 MCP 入口` | `npm i -g rea-agents`，或配 `reaMjs` / `REA_MJS` |
+| `当前目录未授权` | 会话目录不在 `cwdAllow` 里，调整配置或在允许目录开会话 |
+| `target_format_unsupported` | 目标格式不支持，见上面 REA 侧限制 |
+| `capability_unavailable` | 缺外部工具，例如 `tshark` |
 
 ## 开发与反馈
 
-测试脚本位于仓库，npm 包不含 `test/`。
+测试脚本在仓库里，npm 包不含 `test/`。
 
 ```bash
 git clone https://github.com/HarunaTyan/dsh-rea-dispatcher && cd dsh-rea-dispatcher
-node test/resolver.mjs     # 路径派生、白名单、渲染与截断、落盘
-node test/smoke.mjs        # 需已装 rea-agents：工具目录、三步链路、截断落盘
-node test/ab-surface.mjs   # 复算体积对照表
-node test/start-failure.mjs # 启动失败后能重启，而不是卡在超时
-node test/help-sample.mjs   # 打印 rea_help 的真实输出（需已装 rea-agents）
+node test/resolver.mjs
+node test/smoke.mjs
+node test/ab-surface.mjs
+node test/start-failure.mjs
 ```
 
-问题请提交至 [GitHub Issues](https://github.com/HarunaTyan/dsh-rea-dispatcher/issues)，附 DSH 版本、`rea-agents` 版本、`rea doctor --json` 输出与报错原文。
-
-个人维护项目，按优先级尽力修复，不承诺响应时限。
+问题提到 [Issues](https://github.com/HarunaTyan/dsh-rea-dispatcher/issues)，附 DSH 版本、`rea-agents` 版本与报错原文。个人维护，按优先级尽力修复。
 
 ## 许可
 
-MIT。本插件与 REA、Ghidra、DSH 等项目无隶属关系，文中链接仅指向各项目的官方仓库或站点。
+MIT。与 REA、Ghidra、DSH 等项目无隶属关系。

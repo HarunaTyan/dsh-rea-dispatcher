@@ -52,7 +52,34 @@ const run = async (name, args, cwd) => {
 }
 
 try {
-  check('three tools registered', [...registry.keys()].sort().join(',') === 'rea_call,rea_help,rea_tools')
+  const expected = 'rea_apk,rea_call,rea_firmware,rea_general,rea_help,rea_mobile,rea_native,rea_tools,rea_web'
+  check('nine tools registered (three commands + six domains)', [...registry.keys()].sort().join(',') === expected, [...registry.keys()].sort().join(','))
+
+  const nativeList = await run('rea_native', { filter: 'procedure' }, 'D:/re-projects')
+  check('domain tool lists its own domain', nativeList.includes('域 ') && nativeList.includes('procedure_pseudo_code'), nativeList.split('\n')[0])
+  check('domain tool says it is read-only', nativeList.includes('只读清单'))
+
+  const apkList = await run('rea_apk', {}, 'D:/re-projects')
+  check('empty domain still answers', apkList.includes('域 ') && (apkList.includes('还有') || apkList.includes('rea_call')), apkList.split('\n')[0])
+
+  const domainDenied = await run('rea_native', {}, 'C:/Windows')
+  check('domain tool honours cwdAllow', domainDenied.startsWith('当前目录未授权'))
+
+  const misuse = await run('rea_native', { name: 'open_binary' }, 'D:/re-projects')
+  check('domain tool refuses execution args', misuse.includes('只列清单') && misuse.includes('rea_call'), misuse.split('\n')[0].slice(0, 60))
+
+  const stray = await run('rea_apk', { path: 'C:/x.apk' }, 'D:/re-projects')
+  check('domain tool refuses every unknown key', stray.includes('只列清单') && stray.includes('path'), stray.slice(0, 60))
+
+  const miss = await run('rea_web', { filter: 'no_such_thing_xyz' }, 'D:/re-projects')
+  check('domain miss points at rea_tools', miss.includes('本域没有匹配') && miss.includes('rea_tools filter="no_such_thing_xyz"'))
+
+  const off = new Map()
+  apply(
+    { tools: { register: (d) => (off.set(d.name, d), () => off.delete(d.name)) }, effect: (b) => b() },
+    Config({ domainTools: false }),
+  )
+  check('domainTools:false leaves the three commands', [...off.keys()].sort().join(',') === 'rea_call,rea_help,rea_tools', [...off.keys()].join(','))
 
   const denied = await run('rea_tools', {}, 'C:/Windows')
   check('unauthorized cwd refused', denied.startsWith('当前目录未授权'))
